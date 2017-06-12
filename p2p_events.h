@@ -10,6 +10,15 @@ namespace p2p
 
 class client;
 
+/**
+ * @brief Тип кода события
+ */
+using event_code_type = int;
+/**
+ * @brief Уникальный идентификатор события (в пределах объекта client)
+ */
+using message_id_type = uint64_t;
+
 enum class events_code : event_code_type {
     DISCONNECTED, ///< событие disconnected_event
     FRIEND_STATUS_UPDATED, ///< событие friend_status_updated_event
