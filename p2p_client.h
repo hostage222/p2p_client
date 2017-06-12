@@ -304,6 +304,18 @@ public:
     message_id_type send_message(friend_id_type friend_id,
                                  const std::string &message);
 
+    /**
+     * @brief Указать, что сообщение прочитано
+     *
+     * После вызова метода собеседнику придёт событие
+     * friend_message_readed_event
+     *
+     * @param[in] friend_id Уникальный идентификатор контакта
+     * @param[in] message_id Уникальный (для текущего объекта клиента)
+     * идентификатор сообщения
+     */
+    void confirm_reading(friend_id_type friend_id, message_id_type message_id);
+
 private:
     client();
 };

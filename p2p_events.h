@@ -22,7 +22,8 @@ enum class events_code : event_code_type {
     FRIEND_WANTED_TO_DISCONNECT, ///< событие friend_wanted_to_disconnect_event
     FRIEND_DISCONNECTED, ///< событие friend_disconnected_event
     FRIEND_NEW_MESSAGE, ///< событие friend_new_message_event
-    FRIEND_MESSAGE_DELIVERED ///< событие friend_message_delivered_event
+    FRIEND_MESSAGE_DELIVERED, ///< событие friend_message_delivered_event
+    FRIEND_MESSAGE_READED, ///< событие friend_message_readed_event
 };
 
 /**
@@ -211,6 +212,28 @@ public:
     /**
      * @brief Возвращает идентификатор доставленного сообщения
      * @return Идентификатор доставленного сообщения
+     */
+    message_id_type message_id() const { return message_id_value; }
+
+private:
+    const message_id_type message_id_value;
+};
+
+/**
+ * @brief Сообщение было прочитано
+ */
+class friend_message_readed_event : public friend_event
+{
+public:
+    friend_message_readed_event(friend_id_type friend_id,
+                                message_id_type message_id) :
+        friend_event{events_code::FRIEND_MESSAGE_DELIVERED, friend_id},
+        message_id_value{message_id}
+    {
+    }
+    /**
+     * @brief Возвращает идентификатор прочитанного сообщения
+     * @return Идентификатор прочитанного сообщения
      */
     message_id_type message_id() const { return message_id_value; }
 
