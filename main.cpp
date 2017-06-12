@@ -77,6 +77,7 @@ server_thread()
            auto friend_id = e->friend_id();
            <отобразить, что контакт расхотел разговаривать>
            break;
+
        events_code::FRIEND_CONFIRMED_CONNECTION:
            shared_ptr<friend_confirmed_connection_event> e;
            e = static_pointer_cast<friend_confirmed_connection_event>(event);
@@ -153,6 +154,20 @@ server_thread()
    message_id = client->send_message(friend_id, message);
 }
 #endif
+
+#include <string>
+#include <thread>
+
+#include "p2p_client.h"
+
+using namespace std;
+using namespace p2p;
+
+client::ptr cl;
+
+void client_thread(string address)
+{
+}
 
 int main()
 {
