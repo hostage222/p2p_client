@@ -18,8 +18,14 @@ constexpr int MAJOR = 0;
 constexpr int MINOR = 0;
 constexpr int PATCH = 0;
 
-client::client()
+client::client() : con{connection::create()}
 {
+}
+
+client::ptr client::create()
+{
+    auto cl = new client{};
+    return ptr{cl};
 }
 
 string client::to_string(client::connection_result v)
@@ -44,6 +50,27 @@ string client::to_string(client::connection_result v)
     {
         return "UNDEFINED";
     }
+}
+
+bool client::connect_to_server(string address, uint16_t port,
+                               connection_result &result)
+{
+    if (con->is_connected())
+    {
+        result = connection_result::OK;
+        return true;
+    }
+
+    con->connect(address, port);
+    con->wait_connection();
+    if (!con->is_connected())
+    {
+        result = connection_result::NOT_CONNECTED;
+        return false;
+    }
+
+    result = connection_result::OK;
+    return true;
 }
 
 }//p2p

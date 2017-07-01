@@ -12,6 +12,7 @@
 
 #include "p2p_common.h"
 #include "p2p_events.h"
+#include "p2p_connection.h"
 
 /**
  * \mainpage Index page
@@ -68,16 +69,20 @@ public:
         FAILED              ///< Критическая ошибка при обмене данных с
                             /// сервером; соединение разорвано
     };
-    std::string to_string(connection_result v);
+    static std::string to_string(connection_result v);
     /**
      * @brief Установить соединение с сервером; блокирующий метод
      *
-     * Если соединение уже установлено, ничего не делает
+     * Если соединение уже установлено, ничего не делает, возвращает true и
+     * connection_result::OK; нельзя вызывать из разных потоков одновременно
      *
      * @param[in] address Адрес сервера
-     * @return Результат попытки подключения
+     * @param[in] port Порт сервера
+     * @param[out] result Результат попытки подключения
+     * @return Успешность подключения к серверу
      */
-    connection_result connect_to_server(std::string address);
+    bool connect_to_server(std::string address, uint16_t port,
+                           connection_result &result);
 
     /**
      * @brief Версия программного обеспечения сервера и клиента
@@ -89,7 +94,7 @@ public:
      * обратной совместимости,
      * z увеличивается при исправлении некритичных багов с сохранением
      * обратной совместимости;
-     * если значения "x" и/или "y" клиента и сервера не совпадают,
+     * если значения "x" клиента и сервера не совпадают,
      * связь между ними не может быть установлена
      */
     using version = std::string;
@@ -97,14 +102,14 @@ public:
      * @brief Получить версию клиента
      * @return Версия клиента
      */
-    std::string get_version();
+    version get_version();
     /**
      * @brief Получить версию сервера, к которому подключен клиент
      * @return Версия сервера, к которому подключен клиент;
      * если связь с сервером не установлена или была потеряна,
      * метод возвращает пустую строку
      */
-    std::string get_server_version();
+    version get_server_version();
 
     /**
      * @brief Результат выполнения попытки регистрации на сервере
@@ -322,6 +327,7 @@ public:
     void confirm_reading(friend_id_type friend_id, message_id_type message_id);
 
 private:
+    connection::ptr con;
 };
 
 }

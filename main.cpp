@@ -155,6 +155,7 @@ server_thread()
 }
 #endif
 
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -163,7 +164,7 @@ server_thread()
 using namespace std;
 using namespace p2p;
 
-client::ptr cl;
+client::ptr cl = client::create();
 
 void client_thread(string address)
 {
@@ -171,4 +172,10 @@ void client_thread(string address)
 
 int main()
 {
+    client::connection_result result;
+    cl->connect_to_server("127.0.0.1", 14537, result);
+
+    cout << client::to_string(result) << endl;
+
+    return 0;
 }
