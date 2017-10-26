@@ -117,8 +117,6 @@ public:
     enum class register_result
     {
         OK,             ///< Пользователь зарегестрирован
-        INVALID_ACTION, ///< Пользователь авторизован,
-                        /// регистрация пользователя невозможна
         NEED_CODE,      ///< Необходим код авторизации, после получения
                         /// такого ответа, код с сервера должен быть
                         /// передан посредством смс-сообщения
@@ -130,12 +128,11 @@ public:
         FAILED          ///< Критическая ошибка при обмене данных с
                         /// сервером; соединение разорвано
     };
+    static std::string to_string(register_result v);
     /**
      * @brief Зарегестрироваться на сервере
      *
-     * Если соединение не было установлено,
-     * либо пользователь уже авторизовался,
-     * ничего не делает
+     * Если пользователь уже авторизовался, ничего не делает
      *
      * @param[in] phone Номер телефона
      * @param[in] password Пароль
@@ -163,6 +160,7 @@ public:
         FAILED            ///< Критическая ошибка при обмене данных с
                           /// сервером; соединение разорвано
     };
+    static std::string to_string(unregister_result v);
     /**
      * @brief Удалить регистрацию на сервере
      *
@@ -192,6 +190,7 @@ public:
         FAILED            ///< Критическая ошибка при обмене данных с
                           /// сервером; соединение разорвано
     };
+    static std::string to_string(autorize_result v);
     /**
      * @brief Авторизация на сервере
      * @param[in] phone Номер телефона
@@ -328,6 +327,37 @@ public:
 
 private:
     connection::ptr con;
+    version client_version;
+    version server_version;
+
+    template <typename Dict>
+    auto account_operation(const Dict &answer_dict,
+                           std::unique_ptr<request> req,
+                           std::shared_ptr<std::string> answer)
+    {
+        con->send_request(move(req));
+        try
+        {
+            con->wait_answer();
+        }
+        catch (connection::communication_exception&)
+        {
+            return Dict::mapped_type::FAILED;
+        }
+        catch (connection::disconnected_exception&)
+        {
+            return Dict::mapped_type::DISCONNECTED;
+        }
+
+        try
+        {
+            return answer_dict.at(*answer);
+        }
+        catch (std::out_of_range&)
+        {
+            return Dict::mapped_type::FAILED;
+        }
+    }
 };
 
 }

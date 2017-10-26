@@ -157,25 +157,244 @@ server_thread()
 
 #include <iostream>
 #include <string>
+#include <queue>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+
+#include <boost/algorithm/string.hpp>
 
 #include "p2p_client.h"
 
 using namespace std;
 using namespace p2p;
 
-client::ptr cl = client::create();
-
-void client_thread(string address)
+namespace
 {
+
+client::ptr cl = client::create();
+atomic<bool> run{true};
+atomic<bool> ready{false};
+
+queue<string> commands;
+mutex command_mutex;
+condition_variable command_cv;
+
+bool has_cmd = false;
+mutex has_cmd_mutex;
+condition_variable has_cmd_cv;
+
+bool process_server_cmd(string cmd);
+void process_client_cmd(string cmd);
+
+string get_command(bool &empty)
+{
+    unique_lock<mutex> locker{command_mutex};
+    command_cv.wait(locker, [](){ return !commands.empty() || !run; });
+    if (!run)
+    {
+        return "";
+    }
+
+    string res = commands.front();
+    commands.pop();
+    empty = commands.empty();
+    return res;
+}
+
+bool read_command()
+{
+    {
+        unique_lock<mutex> locker{has_cmd_mutex};
+        has_cmd_cv.wait(locker, [](){ return !has_cmd; });
+    }
+
+    {
+        lock_guard<mutex> locker{command_mutex};
+        if (!commands.empty())
+        {
+            return true;
+        }
+    }
+
+    string cmd;
+    do
+    {
+        cout << ">";
+        getline(cin, cmd);
+    }
+    while (cmd.empty());
+
+    {
+        lock_guard<mutex> locker{has_cmd_mutex};
+        has_cmd = true;
+    }
+
+    if (cmd == "exit" || cmd == "quit")
+    {
+        return false;
+    }
+    lock_guard<mutex> locker{command_mutex};
+    commands.push(cmd);
+    command_cv.notify_one();
+    return true;
+}
+
+void process_server()
+{
+    while (run)
+    {
+        bool commands_queue_empty;
+        string cmd = get_command(commands_queue_empty);
+        if (!run)
+        {
+            break;
+        }
+
+        bool proc = process_server_cmd(move(cmd));
+
+        if (proc)
+        {
+            ready = true;
+        }
+
+        if (ready || commands_queue_empty)
+        {
+            lock_guard<mutex> locker{has_cmd_mutex};
+            has_cmd = false;
+            has_cmd_cv.notify_one();
+        }
+
+        if (proc)
+        {
+            //proc_events();
+        }
+    }
+}
+
+struct invalid_cmd
+{
+    invalid_cmd(string message) : message{move(message)} {}
+    string text() const { return message; }
+private:
+    string message;
+};
+
+vector<string> get_words(string cmd)
+{
+    vector<string> strs;
+    boost::split(strs, cmd, boost::is_any_of(" \t"));
+    if (strs.empty())
+    {
+        throw invalid_cmd{"EMPTY COMMAND"};
+    }
+    return strs;
+}
+
+void check_size(const vector<string> &strs, size_t expected_size)
+{
+    if (strs.size() != expected_size)
+    {
+        throw invalid_cmd{"UNEXPECTED PARAMETERS COUNT"};
+    }
+}
+
+bool process_server_cmd(string cmd)
+{
+    try
+    {
+        vector<string> strs = get_words(move(cmd));
+        if (strs.size() == 1 && strs[0] == "process")
+        {
+            return true;
+        }
+
+        if (strs[0] == "connect")
+        {
+            check_size(strs, 3);
+            client::connection_result result;
+            bool res = cl->connect_to_server(strs[1], stoi(strs[2]), result);
+            cout << "result = " << boolalpha << res << "; " <<
+                    client::to_string(result) << endl;
+        }
+        else if (strs[0] == "register")
+        {
+            check_size(strs, 3);
+            auto result = cl->register_on_server(strs[1], strs[2], "");
+            cout << "result = " << client::to_string(result) << endl;
+        }
+        else if (strs[0] == "unregister")
+        {
+            check_size(strs, 3);
+            auto result = cl->unregister_on_server(strs[1], strs[2]);
+            cout << "result = " << client::to_string(result) << endl;
+        }
+        else if (strs[0] == "autorize")
+        {
+            check_size(strs, 3);
+            auto result = cl->autorize_on_server(strs[1], strs[2]);
+            cout << "result = " << client::to_string(result) << endl;
+        }
+        else
+        {
+            cout << "UNEXPECTED COMMAND" << endl;
+        }
+
+        return false;
+    }
+    catch (invalid_cmd &e)
+    {
+        cout << e.text() << endl;
+        return false;
+    }
+}
+
+void process_client_cmd(string cmd)
+{
+    try
+    {
+        vector<string> strs = get_words(move(cmd));
+    }
+    catch (invalid_cmd &e)
+    {
+        cout << e.text() << endl;
+    }
+}
+
 }
 
 int main()
 {
-    client::connection_result result;
-    cl->connect_to_server("127.0.0.1", 14537, result);
+    //cl->connect_to_server("127.0.0.1", 14537, result);
 
-    cout << client::to_string(result) << endl;
+    thread server_thread{process_server};
+
+    while (true)
+    {
+        if (!read_command())
+        {
+            break;
+        }
+
+        if (!ready)
+        {
+            continue;
+        }
+
+        bool empty;
+        string cmd = get_command(empty);
+        process_client_cmd(move(cmd));
+
+        has_cmd = false;
+    }
+
+    run = false;
+    {
+        lock_guard<mutex> locker{command_mutex};
+        command_cv.notify_one();
+    }
+    server_thread.join();
 
     return 0;
 }
